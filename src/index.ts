@@ -89,7 +89,7 @@ const TOOLS: Tool[] = [
     run: (e, a) => moxie(e, "POST", "/action/contacts/create", { json: a }) },
 
   { name: "invoices_create",
-    description: `Create an invoice. Required: clientName, items. sendTo controls EMAIL only (set send=true + contacts to email it). WARNING: the API has no status/draft field, and Moxie's prod pods may create the invoice in SENT status even with sendTo omitted (despite docs claiming DRAFT) — confirm status in the Moxie UI after creating; there is no API to void/delete an invoice. ${X}`,
+    description: `Create an invoice. Required: clientName, items. The client is NOT emailed unless you pass sendTo.send=true (with contacts + emailTemplateName; it 404s without a template). NOTE: the returned "status" is unreliable — Moxie stamps SENT even when no email goes out, so status is NOT proof of sending; the real signal is whether you set send=true. There is no API to void/delete an invoice (do it in the Moxie UI). ${X}`,
     shape: {
       clientName: z.string(), items: z.array(invoiceItem),
       invoiceNumber: z.string().optional(), templateName: z.string().optional(), dueDate: z.string().optional(),

@@ -1,0 +1,5 @@
+# Copy to .dev.vars for local `wrangler dev`. Never commit the real file.
+MOXIE_API_KEY=your-workspace-api-key
+MOXIE_BASE_URL=https://pod00.withmoxie.dev/api/public
+# Optional: gate the MCP endpoint. If set, clients must send Authorization: Bearer <this>.
+MCP_AUTH_TOKEN=

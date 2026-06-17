@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "moxie-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [{ "name": "MoxieMCP", "class_name": "MoxieMCP" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MoxieMCP"] }],
+  "vars": {
+    // Non-secret default; override per-env. Secrets go via `wrangler secret put`.
+    "MOXIE_BASE_URL": "https://pod00.withmoxie.dev/api/public"
+  }
+}

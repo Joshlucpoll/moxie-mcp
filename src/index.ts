@@ -243,6 +243,9 @@ export default {
     const { pathname } = new URL(req.url);
     if (pathname === "/sse" || pathname === "/sse/message") return MoxieMCP.serveSSE("/sse").fetch(req, env, ctx);
     if (pathname === "/mcp") return MoxieMCP.serve("/mcp").fetch(req, env, ctx);
-    return new Response("Moxie MCP server. Connect an MCP client to /mcp (streamable HTTP) or /sse.", { status: 200 });
+    if (pathname === "/") return new Response("Moxie MCP server. Connect an MCP client to /mcp (streamable HTTP) or /sse.", { status: 200 });
+    // Everything else (incl. OAuth /.well-known probes) → honest 404, so clients
+    // don't try to JSON-parse a 200 text body. ponytail: no OAuth endpoints here.
+    return new Response("Not found", { status: 404 });
   },
 };

@@ -43,8 +43,20 @@ npm run deploy     # → https://moxie-mcp.<subdomain>.workers.dev/mcp
 
 ## Connect a client
 
-Point any MCP client at the deployed `/mcp` URL. For the
-[mcp-remote](https://www.npmjs.com/package/mcp-remote) bridge (e.g. Claude Desktop):
+**Claude Code** speaks HTTP MCP natively — add the URL directly (works for local dev too):
+
+```bash
+claude mcp add --transport http moxie http://localhost:8787/mcp   # local dev
+claude mcp add --transport http moxie https://moxie-mcp.<subdomain>.workers.dev/mcp
+```
+
+If `MCP_AUTH_TOKEN` is set, append `--header "Authorization: Bearer <token>"`.
+
+> Don't wrap a Claude Code connection in `mcp-remote` — it runs an OAuth discovery
+> flow this server has no endpoints for, which surfaces as **"Failed to parse JSON"**.
+
+**Clients that only support stdio** (e.g. older Claude Desktop) need the
+[mcp-remote](https://www.npmjs.com/package/mcp-remote) bridge:
 
 ```json
 {
@@ -53,8 +65,6 @@ Point any MCP client at the deployed `/mcp` URL. For the
   }
 }
 ```
-
-If `MCP_AUTH_TOKEN` is set, add `--header "Authorization: Bearer <token>"` to the args.
 
 ## Notes
 

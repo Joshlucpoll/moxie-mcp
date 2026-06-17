@@ -14,9 +14,12 @@
     "agents": "^0.0.80",
     "zod": "^3.23.8"
   },
+  "overrides": {
+    "jsondiffpatch": "^0.7.2"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240909.0",
     "typescript": "^5.5.0",
-    "wrangler": "^3.78.0"
+    "wrangler": "^4.101.0"
   }
 }

@@ -241,8 +241,10 @@ export default {
       if (auth !== `Bearer ${env.MCP_AUTH_TOKEN}`) return new Response("Unauthorized", { status: 401 });
     }
     const { pathname } = new URL(req.url);
-    if (pathname === "/sse" || pathname === "/sse/message") return MoxieMCP.serveSSE("/sse").fetch(req, env, ctx);
-    if (pathname === "/mcp") return MoxieMCP.serve("/mcp").fetch(req, env, ctx);
+    // `binding` must match the Durable Object binding name in wrangler.jsonc
+    // (the SDK defaults to "MCP_OBJECT", which would 500 with "Invalid binding").
+    if (pathname === "/sse" || pathname === "/sse/message") return MoxieMCP.serveSSE("/sse", { binding: "MoxieMCP" }).fetch(req, env, ctx);
+    if (pathname === "/mcp") return MoxieMCP.serve("/mcp", { binding: "MoxieMCP" }).fetch(req, env, ctx);
     if (pathname === "/") return new Response("Moxie MCP server. Connect an MCP client to /mcp (streamable HTTP) or /sse.", { status: 200 });
     // Everything else (incl. OAuth /.well-known probes) → honest 404, so clients
     // don't try to JSON-parse a 200 text body. ponytail: no OAuth endpoints here.

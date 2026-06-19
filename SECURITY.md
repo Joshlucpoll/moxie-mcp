@@ -28,10 +28,14 @@ point the three `agents` advisories clear directly.
 `jsondiffpatch` (XSS in its HTML diff formatter) is pinned to `^0.7.2` via `overrides` in
 `package.json`, which resolves the advisory without the broken `agents` major bump.
 
-## Secrets
+## Auth & secrets
 
-`MOXIE_API_KEY` (and optional `MCP_AUTH_TOKEN`) are Cloudflare Worker secrets — never
-committed. `MOXIE_BASE_URL` is a non-secret var. The local `.dev.vars` file is gitignored.
+The `/mcp` and `/sse` endpoints are protected by an OAuth 2.1 provider
+(`@cloudflare/workers-oauth-provider`); a connecting client is redirected to a login
+screen that checks `MCP_LOGIN_PASSWORD`. Tokens/grants live in the `OAUTH_KV` namespace
+(hashed, never plaintext). Without a valid token, both endpoints return 401.
 
-If `MCP_AUTH_TOKEN` is unset the `/mcp` and `/sse` endpoints are unauthenticated — set it
-(or front the Worker with Cloudflare Access) for any non-trivial deployment.
+`MOXIE_API_KEY` and `MCP_LOGIN_PASSWORD` are Cloudflare Worker secrets — never committed.
+`MOXIE_BASE_URL` is a non-secret var. The local `.dev.vars` file is gitignored. Use a
+strong `MCP_LOGIN_PASSWORD`: it is the only thing standing between the public URL and
+write access to the real Moxie workspace.

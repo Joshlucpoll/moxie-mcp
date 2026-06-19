@@ -10,6 +10,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.8.1",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "agents": "^0.0.80",
     "zod": "^3.23.8"

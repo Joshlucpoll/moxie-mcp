@@ -1,12 +1,15 @@
 import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, type ZodRawShape } from "zod";
+import OAuthProvider, { type OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import { buildUrl, buildAttachmentForm } from "./lib";
 
 export interface Env {
   MOXIE_API_KEY: string;
-  MOXIE_BASE_URL: string; // e.g. https://pod00.withmoxie.dev/api/public
-  MCP_AUTH_TOKEN?: string; // optional bearer gate for the MCP endpoint
+  MOXIE_BASE_URL: string; // e.g. https://pod01.withmoxie.com/api/public
+  MCP_LOGIN_PASSWORD: string; // single-user password for the OAuth login screen
+  OAUTH_KV: KVNamespace; // token/grant storage for the OAuth provider
+  OAUTH_PROVIDER: OAuthHelpers; // injected by OAuthProvider at runtime
   MoxieMCP: DurableObjectNamespace;
 }
 
@@ -234,20 +237,72 @@ export class MoxieMCP extends McpAgent<Env> {
   }
 }
 
-export default {
-  fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> | Response {
-    if (env.MCP_AUTH_TOKEN) {
-      const auth = req.headers.get("Authorization");
-      if (auth !== `Bearer ${env.MCP_AUTH_TOKEN}`) return new Response("Unauthorized", { status: 401 });
+// Constant-time compare so the password check doesn't leak length/content via timing.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+const htmlResp = (body: string, status = 200) => new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8" } });
+
+function loginPage(oauthReqJson: string, clientName: string, error?: string): string {
+  return `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Moxie MCP — sign in</title>
+<body style="font-family:system-ui;max-width:24rem;margin:4rem auto;padding:0 1rem">
+<h2>Moxie MCP</h2>
+<p><strong>${esc(clientName || "An application")}</strong> wants to connect to your Moxie workspace.</p>
+${error ? `<p style="color:#b00">${esc(error)}</p>` : ""}
+<form method="post" action="/authorize">
+  <input type="hidden" name="oauthReq" value="${esc(oauthReqJson)}">
+  <label>Password<br><input type="password" name="password" autofocus required style="width:100%;padding:.5rem;margin:.5rem 0"></label>
+  <button type="submit" style="width:100%;padding:.6rem;margin-top:.5rem">Authorize</button>
+</form></body>`;
+}
+
+// Default (non-API) handler: serves the OAuth authorization UI and a root info page.
+const authHandler = {
+  async fetch(req: Request, env: Env): Promise<Response> {
+    const url = new URL(req.url);
+
+    if (url.pathname === "/authorize") {
+      if (req.method === "POST") {
+        const form = await req.formData();
+        const oauthReq = JSON.parse(String(form.get("oauthReq") ?? "{}"));
+        if (!timingSafeEqual(String(form.get("password") ?? ""), env.MCP_LOGIN_PASSWORD)) {
+          const client = await env.OAUTH_PROVIDER.lookupClient(oauthReq.clientId);
+          return htmlResp(loginPage(JSON.stringify(oauthReq), client?.clientName ?? "", "Incorrect password"), 401);
+        }
+        const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
+          request: oauthReq,
+          userId: "josh",
+          metadata: {},
+          scope: oauthReq.scope ?? [],
+          props: { login: "josh" },
+        });
+        return Response.redirect(redirectTo, 302);
+      }
+      const oauthReq = await env.OAUTH_PROVIDER.parseAuthRequest(req);
+      const client = await env.OAUTH_PROVIDER.lookupClient(oauthReq.clientId);
+      return htmlResp(loginPage(JSON.stringify(oauthReq), client?.clientName ?? ""));
     }
-    const { pathname } = new URL(req.url);
-    // `binding` must match the Durable Object binding name in wrangler.jsonc
-    // (the SDK defaults to "MCP_OBJECT", which would 500 with "Invalid binding").
-    if (pathname === "/sse" || pathname === "/sse/message") return MoxieMCP.serveSSE("/sse", { binding: "MoxieMCP" }).fetch(req, env, ctx);
-    if (pathname === "/mcp") return MoxieMCP.serve("/mcp", { binding: "MoxieMCP" }).fetch(req, env, ctx);
-    if (pathname === "/") return new Response("Moxie MCP server. Connect an MCP client to /mcp (streamable HTTP) or /sse.", { status: 200 });
-    // Everything else (incl. OAuth /.well-known probes) → honest 404, so clients
-    // don't try to JSON-parse a 200 text body. ponytail: no OAuth endpoints here.
+
+    if (url.pathname === "/") return new Response("Moxie MCP server. Add as a custom connector in Claude; you'll be asked to sign in.", { status: 200 });
     return new Response("Not found", { status: 404 });
   },
 };
+
+export default new OAuthProvider({
+  apiHandlers: {
+    // `binding` must match the Durable Object binding in wrangler.jsonc (SDK default
+    // is "MCP_OBJECT", which would 500 "Invalid binding").
+    "/mcp": MoxieMCP.serve("/mcp", { binding: "MoxieMCP" }) as never,
+    "/sse": MoxieMCP.serveSSE("/sse", { binding: "MoxieMCP" }) as never,
+  },
+  defaultHandler: authHandler as never,
+  authorizeEndpoint: "/authorize",
+  tokenEndpoint: "/token",
+  clientRegistrationEndpoint: "/register",
+});

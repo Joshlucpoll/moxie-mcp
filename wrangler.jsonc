@@ -25,6 +25,12 @@
       ]
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "60b5a21d22fe419fae00db7a8d747ffe"
+    }
+  ],
   "vars": {
     // Non-secret default; override per-env. Secrets go via `wrangler secret put`.
     "MOXIE_BASE_URL": "https://pod01.withmoxie.com/api/public"
